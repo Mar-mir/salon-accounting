@@ -431,16 +431,18 @@ class SalonApp:
         items_frame.pack(fill="both", expand=True, pady=(0, 10))
 
         # Items list (Treeview)
-        cols = ("service", "category", "employee", "amount")
+        cols = ("service", "category", "employee", "amount", "commission")
         self.items_tree = ttk.Treeview(items_frame, columns=cols, show="headings", height=5)
         self.items_tree.heading("service", text="خدمت", anchor="e")
         self.items_tree.heading("category", text="دسته", anchor="e")
         self.items_tree.heading("employee", text="کارمند", anchor="e")
         self.items_tree.heading("amount", text="مبلغ", anchor="e")
-        self.items_tree.column("service", width=180, anchor="e")
-        self.items_tree.column("category", width=100, anchor="e")
-        self.items_tree.column("employee", width=120, anchor="e")
-        self.items_tree.column("amount", width=120, anchor="e")
+        self.items_tree.heading("commission", text="پورسانت", anchor="e")
+        self.items_tree.column("service", width=150, anchor="e")
+        self.items_tree.column("category", width=80, anchor="e")
+        self.items_tree.column("employee", width=100, anchor="e")
+        self.items_tree.column("amount", width=110, anchor="e")
+        self.items_tree.column("commission", width=100, anchor="e")
 
         scrollbar = ttk.Scrollbar(items_frame, orient="vertical", command=self.items_tree.yview)
         self.items_tree.configure(yscrollcommand=scrollbar.set)
@@ -537,16 +539,18 @@ class SalonApp:
 
         svc = self.services[svc_idx]
         emp = self.employees[emp_idx]
+        commission = int(int(amount) * emp["share_percent"] / 100)
 
         self.transaction_items.append({
             "service": svc["name"],
             "category": svc["category"],
             "employee": emp["name"],
             "amount": int(amount),
+            "commission": commission,
         })
 
         self.items_tree.insert("", "end",
-            values=(svc["name"], svc["category"], emp["name"], f"{int(amount):,}"))
+            values=(svc["name"], svc["category"], emp["name"], f"{int(amount):,}", f"{commission:,}"))
 
         self.update_total()
         self.item_amount.delete(0, tk.END)
@@ -619,12 +623,13 @@ class SalonApp:
         self.card_total = self.create_card(cards, "💰 جمع کل امروز", "۰")
         self.card_count = self.create_card(cards, "👥 تعداد مشتری", "۰")
         self.card_services = self.create_card(cards, "🛎️ تعداد خدمات", "۰")
+        self.card_commission = self.create_card(cards, "💸 پورسانت کارمندان", "۰", color=Theme.WARNING)
 
         # Transaction table
         table_frame = ttk.Frame(self.tab_reports)
         table_frame.pack(fill="both", expand=True, padx=15, pady=(0, 10))
 
-        cols = ("time", "customer", "service", "category", "employee", "amount")
+        cols = ("time", "customer", "service", "category", "employee", "amount", "commission")
         self.report_tree = ttk.Treeview(table_frame, columns=cols, show="headings", height=12)
         self.report_tree.heading("time", text="تاریخ", anchor="e")
         self.report_tree.heading("customer", text="مشتری", anchor="e")
@@ -632,19 +637,21 @@ class SalonApp:
         self.report_tree.heading("category", text="دسته", anchor="e")
         self.report_tree.heading("employee", text="کارمند", anchor="e")
         self.report_tree.heading("amount", text="مبلغ", anchor="e")
-        self.report_tree.column("time", width=110, anchor="e")
-        self.report_tree.column("customer", width=130, anchor="e")
-        self.report_tree.column("service", width=130, anchor="e")
-        self.report_tree.column("category", width=80, anchor="e")
-        self.report_tree.column("employee", width=100, anchor="e")
-        self.report_tree.column("amount", width=120, anchor="e")
+        self.report_tree.heading("commission", text="پورسانت", anchor="e")
+        self.report_tree.column("time", width=90, anchor="e")
+        self.report_tree.column("customer", width=120, anchor="e")
+        self.report_tree.column("service", width=110, anchor="e")
+        self.report_tree.column("category", width=70, anchor="e")
+        self.report_tree.column("employee", width=90, anchor="e")
+        self.report_tree.column("amount", width=100, anchor="e")
+        self.report_tree.column("commission", width=100, anchor="e")
 
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.report_tree.yview)
         self.report_tree.configure(yscrollcommand=scrollbar.set)
         self.report_tree.pack(side="right", fill="both", expand=True)
         scrollbar.pack(side="left", fill="y")
 
-    def create_card(self, parent, title, value):
+    def create_card(self, parent, title, value, color=None):
         card = tk.Frame(parent, bg=Theme.BG_CARD, highlightbackground=Theme.ACCENT,
                        highlightthickness=1)
         card.pack(side="right", fill="both", expand=True, padx=5)
@@ -653,7 +660,7 @@ class SalonApp:
                 font=("Tahoma", 10), anchor="e").pack(pady=(8, 0), padx=10, anchor="e")
 
         var = tk.StringVar(value=value)
-        tk.Label(card, textvariable=var, bg=Theme.BG_CARD, fg=Theme.SUCCESS,
+        tk.Label(card, textvariable=var, bg=Theme.BG_CARD, fg=color or Theme.SUCCESS,
                 font=("Tahoma", 22, "bold"), anchor="e").pack(pady=(0, 8), padx=10, anchor="e")
 
         return {"card": card, "var": var}
@@ -662,21 +669,27 @@ class SalonApp:
         today = PersianDate.today_str()
         transactions = ExcelManager.get_transactions(start_date=today, end_date=today)
 
+        # Build employee share lookup
+        emp_shares = {e["name"]: e["share_percent"] for e in self.employees}
+
         # Update cards
         total = sum(t["amount"] for t in transactions)
         customers = len(set(t["customer"] for t in transactions))
         services_count = len(transactions)
+        total_commission = sum(int(t["amount"] * emp_shares.get(t["employee"], 0) / 100) for t in transactions)
 
         self.card_total["var"].set(f"{total:,}")
         self.card_count["var"].set(str(customers))
         self.card_services["var"].set(str(services_count))
+        self.card_commission["var"].set(f"{total_commission:,}")
 
         # Update table
         self.report_tree.delete(*self.report_tree.get_children())
         for t in reversed(transactions):
+            comm = int(t["amount"] * emp_shares.get(t["employee"], 0) / 100)
             self.report_tree.insert("", "end",
                 values=(t["date"], t["customer"], t["service"],
-                       t["category"], t["employee"], f"{t['amount']:,}"))
+                       t["category"], t["employee"], f"{t['amount']:,}", f"{comm:,}"))
 
     # ─── Monthly Report Tab ───
     def build_monthly_tab(self):
@@ -713,16 +726,18 @@ class SalonApp:
         table_frame = ttk.Frame(self.tab_monthly)
         table_frame.pack(fill="both", expand=True, padx=15, pady=(0, 10))
 
-        cols = ("employee", "category", "total_services", "total_amount")
+        cols = ("employee", "category", "total_services", "total_amount", "commission")
         self.monthly_tree = ttk.Treeview(table_frame, columns=cols, show="headings", height=10)
         self.monthly_tree.heading("employee", text="کارمند", anchor="e")
         self.monthly_tree.heading("category", text="دسته خدمت", anchor="e")
-        self.monthly_tree.heading("total_services", text="تعداد خدمات", anchor="e")
+        self.monthly_tree.heading("total_services", text="تعداد", anchor="e")
         self.monthly_tree.heading("total_amount", text="جمع درآمد", anchor="e")
-        self.monthly_tree.column("employee", width=180, anchor="e")
-        self.monthly_tree.column("category", width=150, anchor="e")
-        self.monthly_tree.column("total_services", width=120, anchor="e")
-        self.monthly_tree.column("total_amount", width=150, anchor="e")
+        self.monthly_tree.heading("commission", text="پورسانت", anchor="e")
+        self.monthly_tree.column("employee", width=150, anchor="e")
+        self.monthly_tree.column("category", width=120, anchor="e")
+        self.monthly_tree.column("total_services", width=80, anchor="e")
+        self.monthly_tree.column("total_amount", width=130, anchor="e")
+        self.monthly_tree.column("commission", width=130, anchor="e")
 
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.monthly_tree.yview)
         self.monthly_tree.configure(yscrollcommand=scrollbar.set)
@@ -751,18 +766,23 @@ class SalonApp:
             end_date = f"{year+1}/01/01"
 
         # Get all transactions and filter by date prefix
+        # Get all transactions and filter by date prefix
         all_transactions = ExcelManager.get_transactions()
         monthly = [t for t in all_transactions if t["date"] >= start_date and t["date"] < end_date]
+        # Build employee share lookup
+        emp_shares = {e["name"]: e["share_percent"] for e in self.employees}
 
         # Clear previous
         for widget in self.monthly_cards_frame.winfo_children():
             widget.destroy()
 
         # Create employee summary cards
-        emp_totals = defaultdict(lambda: {"count": 0, "amount": 0})
+        emp_totals = defaultdict(lambda: {"count": 0, "amount": 0, "commission": 0})
         for t in monthly:
+            comm = int(t["amount"] * emp_shares.get(t["employee"], 0) / 100)
             emp_totals[t["employee"]]["count"] += 1
             emp_totals[t["employee"]]["amount"] += t["amount"]
+            emp_totals[t["employee"]]["commission"] += comm
 
         for emp_name, data in sorted(emp_totals.items(), key=lambda x: -x[1]["amount"]):
             card = tk.Frame(self.monthly_cards_frame, bg=Theme.BG_CARD,
@@ -774,25 +794,31 @@ class SalonApp:
             tk.Label(card, text=f"{data['count']} خدمت", bg=Theme.BG_CARD, fg=Theme.TEXT_DIM,
                     font=("Tahoma", 10)).pack(anchor="e", padx=10)
             tk.Label(card, text=f"{data['amount']:,} تومان", bg=Theme.BG_CARD, fg=Theme.SUCCESS,
-                    font=("Tahoma", 16, "bold")).pack(pady=(0, 8), anchor="center", padx=10)
+                    font=("Tahoma", 16, "bold")).pack(pady=(2, 2), anchor="center", padx=10)
+            if data["commission"] > 0:
+                tk.Label(card, text=f"💸 پورسانت: {data['commission']:,} تومان", bg=Theme.BG_CARD, fg=Theme.WARNING,
+                        font=("Tahoma", 11, "bold")).pack(pady=(0, 8), anchor="center", padx=10)
 
         # Detail table
         self.monthly_tree.delete(*self.monthly_tree.get_children())
-        emp_cat = defaultdict(lambda: defaultdict(lambda: {"count": 0, "amount": 0}))
+        emp_cat = defaultdict(lambda: defaultdict(lambda: {"count": 0, "amount": 0, "commission": 0}))
         for t in monthly:
+            comm = int(t["amount"] * emp_shares.get(t["employee"], 0) / 100)
             emp_cat[t["employee"]][t["category"]]["count"] += 1
             emp_cat[t["employee"]][t["category"]]["amount"] += t["amount"]
+            emp_cat[t["employee"]][t["category"]]["commission"] += comm
 
         for emp_name in sorted(emp_cat.keys()):
             for cat_name in sorted(emp_cat[emp_name].keys()):
                 data = emp_cat[emp_name][cat_name]
                 self.monthly_tree.insert("", "end",
-                    values=(emp_name, cat_name, data["count"], f"{data['amount']:,}"))
+                    values=(emp_name, cat_name, data["count"], f"{data['amount']:,}", f"{data['commission']:,}"))
 
         # Grand total row
         grand_total = sum(t["amount"] for t in monthly)
+        grand_commission = sum(int(t["amount"] * emp_shares.get(t["employee"], 0) / 100) for t in monthly)
         self.monthly_tree.insert("", "end",
-            values=("مجموع کل", "", len(monthly), f"{grand_total:,}"),
+            values=("مجموع کل", "", len(monthly), f"{grand_total:,}", f"{grand_commission:,}"),
             tags=("total",))
         self.monthly_tree.tag_configure("total", background=Theme.ACCENT, foreground=Theme.TEXT)
 
@@ -822,12 +848,15 @@ class SalonApp:
         ws.title = f"گزارش {month_str}"
 
         # Header
-        headers = ["تاریخ", "مشتری", "خدمت", "دسته", "کارمند", "مبلغ", "یادداشت"]
+        headers = ["تاریخ", "مشتری", "خدمت", "دسته", "کارمند", "مبلغ", "پورسانت", "یادداشت"]
         for col, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True, color="FFFFFF", size=11)
             cell.fill = PatternFill(start_color="E94560", end_color="E94560", fill_type="solid")
             cell.alignment = Alignment(horizontal="center")
+
+        # Build employee share lookup
+        emp_shares = {e["name"]: e["share_percent"] for e in self.employees}
 
         # Data
         for row, t in enumerate(monthly, 2):
@@ -837,10 +866,12 @@ class SalonApp:
             ws.cell(row=row, column=4, value=t["category"])
             ws.cell(row=row, column=5, value=t["employee"])
             ws.cell(row=row, column=6, value=t["amount"])
-            ws.cell(row=row, column=7, value=t["note"])
+            comm = int(t["amount"] * emp_shares.get(t["employee"], 0) / 100)
+            ws.cell(row=row, column=7, value=comm)
+            ws.cell(row=row, column=8, value=t["note"])
 
         # Auto-size columns
-        for col in range(1, 8):
+        for col in range(1, 9):
             ws.column_dimensions[get_column_letter(col)].width = 18
 
         filepath = os.path.join(DATA_DIR, f"report_{year}_{month:02d}.xlsx")

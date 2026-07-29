@@ -387,10 +387,12 @@ class SalonApp:
         self.tab_services = ttk.Frame(self.notebook)
         self.tab_reports = ttk.Frame(self.notebook)
         self.tab_monthly = ttk.Frame(self.notebook)
+        self.tab_backup = ttk.Frame(self.notebook)
 
         self.notebook.add(self.tab_main, text="  💰 ثبت تراکنش  ")
         self.notebook.add(self.tab_reports, text="  📊 گزارش امروز  ")
         self.notebook.add(self.tab_monthly, text="  📅 گزارش ماهانه  ")
+        self.notebook.add(self.tab_backup, text="  📦 بکاپ  ")
         self.notebook.add(self.tab_employees, text="  👥 کارمندان  ")
         self.notebook.add(self.tab_services, text="  🛎️ خدمات  ")
 
@@ -398,6 +400,7 @@ class SalonApp:
         self.build_main_tab()
         self.build_reports_tab()
         self.build_monthly_tab()
+        self.build_backup_tab()
         self.build_employees_tab()
         self.build_services_tab()
 
@@ -1039,6 +1042,310 @@ class SalonApp:
             ExcelManager.save_services(self.services)
             self.refresh_service_table()
             self.refresh_comboboxes()
+
+    # ─── Backup Tab ───
+    def build_backup_tab(self):
+        top = ttk.Frame(self.tab_backup)
+        top.pack(fill="x", padx=15, pady=10)
+
+        ttk.Label(top, text="📦 بکاپ و خروجی اکسل", style="Subtitle.TLabel").pack(side="right")
+
+        # Main backup buttons area
+        main_frame = ttk.Frame(self.tab_backup)
+        main_frame.pack(fill="both", expand=True, padx=15, pady=10)
+
+        # ── Quick Backups Section ──
+        quick_frame = ttk.LabelFrame(main_frame, text=" بکاپ سریع ", style="Card.TFrame")
+        quick_frame.pack(fill="x", pady=(0, 15))
+
+        btn_row1 = ttk.Frame(quick_frame, style="Card.TFrame")
+        btn_row1.pack(fill="x", padx=10, pady=10)
+
+        ttk.Button(btn_row1, text="📅 بکاپ روزانه\n(امروز)", style="Accent.TButton",
+                  command=self.backup_daily).pack(side="right", padx=5, ipady=10)
+        ttk.Button(btn_row1, text="📆 بکاپ هفتگی\n(۷ روز اخیر)", style="Accent.TButton",
+                  command=self.backup_weekly).pack(side="right", padx=5, ipady=10)
+        ttk.Button(btn_row1, text="🗓️ بکاپ ماهانه\n(این ماه)", style="Accent.TButton",
+                  command=self.backup_monthly).pack(side="right", padx=5, ipady=10)
+        ttk.Button(btn_row1, text="📦 بکاپ کامل\n(همه داده‌ها)", style="Success.TButton",
+                  command=self.backup_full).pack(side="right", padx=5, ipady=10)
+
+        # ── Custom Date Range ──
+        custom_frame = ttk.LabelFrame(main_frame, text=" بکاپ با بازه دلخواه ", style="Card.TFrame")
+        custom_frame.pack(fill="x", pady=(0, 15))
+
+        custom_row = ttk.Frame(custom_frame, style="Card.TFrame")
+        custom_row.pack(fill="x", padx=10, pady=10)
+
+        ttk.Label(custom_row, text="از:", style="Card.TLabel").pack(side="right", padx=(0, 3))
+        self.backup_from = tk.Entry(custom_row, font=("Tahoma", 11), bg=Theme.ENTRY_BG,
+                                   fg=Theme.TEXT, insertbackground=Theme.ACCENT,
+                                   justify="right", width=12, relief="flat")
+        self.backup_from.pack(side="right", padx=3)
+        self.backup_from.insert(0, PersianDate.today_str())
+
+        ttk.Label(custom_row, text="تا:", style="Card.TLabel").pack(side="right", padx=(10, 3))
+        self.backup_to = tk.Entry(custom_row, font=("Tahoma", 11), bg=Theme.ENTRY_BG,
+                                  fg=Theme.TEXT, insertbackground=Theme.ACCENT,
+                                  justify="right", width=12, relief="flat")
+        self.backup_to.pack(side="right", padx=3)
+        self.backup_to.insert(0, PersianDate.today_str())
+
+        ttk.Button(custom_row, text="📥 خروجی بازه دلخواه", style="Accent.TButton",
+                  command=self.backup_custom_range).pack(side="right", padx=10)
+
+        # ── Backup History ──
+        history_frame = ttk.LabelFrame(main_frame, text=" تاریخچه بکاپ‌ها ", style="Card.TFrame")
+        history_frame.pack(fill="both", expand=True)
+
+        cols = ("filename", "date", "type", "size")
+        self.backup_tree = ttk.Treeview(history_frame, columns=cols, show="headings", height=8)
+        self.backup_tree.heading("filename", text="نام فایل", anchor="e")
+        self.backup_tree.heading("date", text="تاریخ ایجاد", anchor="e")
+        self.backup_tree.heading("type", text="نوع", anchor="e")
+        self.backup_tree.heading("size", text="حجم", anchor="e")
+        self.backup_tree.column("filename", width=250, anchor="e")
+        self.backup_tree.column("date", width=150, anchor="e")
+        self.backup_tree.column("type", width=120, anchor="e")
+        self.backup_tree.column("size", width=100, anchor="e")
+
+        scrollbar = ttk.Scrollbar(history_frame, orient="vertical", command=self.backup_tree.yview)
+        self.backup_tree.configure(yscrollcommand=scrollbar.set)
+        self.backup_tree.pack(side="right", fill="both", expand=True, padx=(10, 0), pady=5)
+        scrollbar.pack(side="left", fill="y", pady=5, padx=(10, 0))
+
+        refresh_btn = ttk.Button(history_frame, text="🔄 بروزرسانی لیست", style="Secondary.TButton",
+                               command=self.refresh_backup_history)
+        refresh_btn.pack(side="left", padx=5, pady=5)
+
+        # Load history on startup
+        self.refresh_backup_history()
+
+    def _create_backup_excel(self, transactions, title, filename):
+        """Create a backup Excel file with transactions + summary"""
+        wb = Workbook()
+
+        # ── Sheet 1: Transactions ──
+        ws = wb.active
+        ws.title = "تراکنش‌ها"
+        headers = ["تاریخ", "مشتری", "خدمت", "دسته", "کارمند", "مبلغ", "پورسانت", "یادداشت"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF", size=11)
+            cell.fill = PatternFill(start_color="E91E63", end_color="E91E63", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+
+        emp_shares = {e["name"]: e["share_percent"] for e in self.employees}
+
+        for row, t in enumerate(transactions, 2):
+            ws.cell(row=row, column=1, value=t["date"])
+            ws.cell(row=row, column=2, value=t["customer"])
+            ws.cell(row=row, column=3, value=t["service"])
+            ws.cell(row=row, column=4, value=t["category"])
+            ws.cell(row=row, column=5, value=t["employee"])
+            ws.cell(row=row, column=6, value=t["amount"])
+            comm = int(t["amount"] * emp_shares.get(t["employee"], 0) / 100)
+            ws.cell(row=row, column=7, value=comm)
+            ws.cell(row=row, column=8, value=t["note"])
+
+        for col in range(1, 9):
+            ws.column_dimensions[get_column_letter(col)].width = 16
+
+        # ── Sheet 2: Summary by Employee ──
+        ws2 = wb.create_sheet("خلاصه کارمندان")
+        summary_headers = ["کارمند", "تعداد خدمات", "جمع درآمد", "جمع پورسانت"]
+        for col, header in enumerate(summary_headers, 1):
+            cell = ws2.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF", size=11)
+            cell.fill = PatternFill(start_color="E91E63", end_color="E91E63", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+
+        emp_summary = defaultdict(lambda: {"count": 0, "amount": 0, "commission": 0})
+        for t in transactions:
+            comm = int(t["amount"] * emp_shares.get(t["employee"], 0) / 100)
+            emp_summary[t["employee"]]["count"] += 1
+            emp_summary[t["employee"]]["amount"] += t["amount"]
+            emp_summary[t["employee"]]["commission"] += comm
+
+        row = 2
+        grand_amount = 0
+        grand_commission = 0
+        for emp_name, data in sorted(emp_summary.items(), key=lambda x: -x[1]["amount"]):
+            ws2.cell(row=row, column=1, value=emp_name)
+            ws2.cell(row=row, column=2, value=data["count"])
+            ws2.cell(row=row, column=3, value=data["amount"])
+            ws2.cell(row=row, column=4, value=data["commission"])
+            grand_amount += data["amount"]
+            grand_commission += data["commission"]
+            row += 1
+
+        # Grand total
+        ws2.cell(row=row, column=1, value="مجموع کل")
+        ws2.cell(row=row, column=1).font = Font(bold=True)
+        ws2.cell(row=row, column=2, value=len(transactions))
+        ws2.cell(row=row, column=2).font = Font(bold=True)
+        ws2.cell(row=row, column=3, value=grand_amount)
+        ws2.cell(row=row, column=3).font = Font(bold=True)
+        ws2.cell(row=row, column=4, value=grand_commission)
+        ws2.cell(row=row, column=4).font = Font(bold=True)
+
+        for col in range(1, 5):
+            ws2.column_dimensions[get_column_letter(col)].width = 18
+
+        # ── Sheet 3: Employees List ──
+        ws3 = wb.create_sheet("کارمندان")
+        emp_headers = ["نام", "تخصص", "تلفن", "درصد سهم"]
+        for col, header in enumerate(emp_headers, 1):
+            cell = ws3.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="E91E63", end_color="E91E63", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+
+        for row, emp in enumerate(self.employees, 2):
+            ws3.cell(row=row, column=1, value=emp["name"])
+            ws3.cell(row=row, column=2, value=emp["specialty"])
+            ws3.cell(row=row, column=3, value=emp["phone"])
+            ws3.cell(row=row, column=4, value=emp["share_percent"])
+
+        for col in range(1, 5):
+            ws3.column_dimensions[get_column_letter(col)].width = 18
+
+        # Save
+        filepath = os.path.join(DATA_DIR, filename)
+        wb.save(filepath)
+        return filepath
+
+    def _get_file_size(self, filepath):
+        """Get human-readable file size"""
+        size = os.path.getsize(filepath)
+        if size < 1024:
+            return f"{size} B"
+        elif size < 1024 * 1024:
+            return f"{size // 1024} KB"
+        else:
+            return f"{size // (1024 * 1024)} MB"
+
+    def refresh_backup_history(self):
+        """Refresh the backup history list"""
+        self.backup_tree.delete(*self.backup_tree.get_children())
+        backups = []
+        if os.path.exists(DATA_DIR):
+            for f in sorted(os.listdir(DATA_DIR), reverse=True):
+                if f.startswith("backup_") and f.endswith(".xlsx"):
+                    filepath = os.path.join(DATA_DIR, f)
+                    stat = os.stat(filepath)
+                    date_str = datetime.fromtimestamp(stat.st_mtime).strftime("%Y/%m/%d %H:%M")
+                    # Determine type from filename
+                    if "_daily_" in f:
+                        btype = "روزانه"
+                    elif "_weekly_" in f:
+                        btype = "هفتگی"
+                    elif "_monthly_" in f:
+                        btype = "ماهانه"
+                    elif "_full_" in f:
+                        btype = "کامل"
+                    elif "_custom_" in f:
+                        btype = "دلخواه"
+                    else:
+                        btype = "سایر"
+                    backups.append((f, date_str, btype, self._get_file_size(filepath)))
+
+        for b in backups[:20]:  # Show last 20
+            self.backup_tree.insert("", "end", values=b)
+
+    def backup_daily(self):
+        """Backup today's transactions"""
+        today = PersianDate.today_str()
+        transactions = ExcelManager.get_transactions(start_date=today, end_date=today)
+        if not transactions:
+            messagebox.showinfo("اطلاع", "تراکنشی برای امروز وجود ندارد")
+            return
+        filename = f"backup_daily_{today.replace('/', '-')}.xlsx"
+        filepath = self._create_backup_excel(transactions, "بکاپ روزانه", filename)
+        messagebox.showinfo("موفق", f"✅ بکاپ روزانه ذخیره شد!\n\n📁 {filepath}\n📊 {len(transactions)} تراکنش")
+        self.refresh_backup_history()
+
+    def backup_weekly(self):
+        """Backup last 7 days"""
+        from datetime import timedelta
+        today = datetime.now()
+        week_ago = today - timedelta(days=7)
+
+        # Convert to Shamsi for filtering
+        start_jy, start_jm, start_jd = PersianDate.gregorian_to_jalali(week_ago.year, week_ago.month, week_ago.day)
+        end_jy, end_jm, end_jd = PersianDate.gregorian_to_jalali(today.year, today.month, today.day)
+
+        start_date = f"{start_jy}/{start_jm:02d}/{start_jd:02d}"
+        end_date = f"{end_jy}/{end_jm:02d}/{end_jd:02d}"
+
+        all_transactions = ExcelManager.get_transactions()
+        weekly = [t for t in all_transactions if start_date <= t["date"] <= end_date]
+
+        if not weekly:
+            messagebox.showinfo("اطلاع", "تراکنشی در ۷ روز اخیر وجود ندارد")
+            return
+
+        filename = f"backup_weekly_{end_date.replace('/', '-')}.xlsx"
+        filepath = self._create_backup_excel(weekly, "بکاپ هفتگی", filename)
+        messagebox.showinfo("موفق", f"✅ بکاپ هفتگی ذخیره شد!\n\n📁 {filepath}\n📊 {len(weekly)} تراکنش\n📅 {start_date} تا {end_date}")
+        self.refresh_backup_history()
+
+    def backup_monthly(self):
+        """Backup current month"""
+        now = datetime.now()
+        jy, jm, jd = PersianDate.gregorian_to_jalali(now.year, now.month, now.day)
+
+        start_date = f"{jy}/{jm:02d}/01"
+        if jm < 12:
+            end_date = f"{jy}/{jm+1:02d}/01"
+        else:
+            end_date = f"{jy+1}/01/01"
+
+        all_transactions = ExcelManager.get_transactions()
+        monthly = [t for t in all_transactions if start_date <= t["date"] < end_date]
+
+        if not monthly:
+            messagebox.showinfo("اطلاع", "تراکنشی برای این ماه وجود ندارد")
+            return
+
+        filename = f"backup_monthly_{jy}_{jm:02d}.xlsx"
+        filepath = self._create_backup_excel(monthly, "بکاپ ماهانه", filename)
+        messagebox.showinfo("موفق", f"✅ بکاپ ماهانه ذخیره شد!\n\n📁 {filepath}\n📊 {len(monthly)} تراکنش\n📅 {jy}/{jm:02d}")
+        self.refresh_backup_history()
+
+    def backup_full(self):
+        """Backup all data"""
+        all_transactions = ExcelManager.get_transactions()
+        if not all_transactions:
+            messagebox.showinfo("اطلاع", "هیچ تراکنشی وجود ندارد")
+            return
+
+        today = PersianDate.today_str()
+        filename = f"backup_full_{today.replace('/', '-')}.xlsx"
+        filepath = self._create_backup_excel(all_transactions, "بکاپ کامل", filename)
+        messagebox.showinfo("موفق", f"✅ بکاپ کامل ذخیره شد!\n\n📁 {filepath}\n📊 {len(all_transactions)} تراکنش\n👥 {len(self.employees)} کارمند\n🛎️ {len(self.services)} خدمت")
+        self.refresh_backup_history()
+
+    def backup_custom_range(self):
+        """Backup with custom date range"""
+        from_date = self.backup_from.get().strip()
+        to_date = self.backup_to.get().strip()
+
+        if not from_date or not to_date:
+            messagebox.showwarning("خطا", "تاریخ شروع و پایان را وارد کنید")
+            return
+
+        all_transactions = ExcelManager.get_transactions()
+        custom = [t for t in all_transactions if from_date <= t["date"] <= to_date]
+
+        if not custom:
+            messagebox.showinfo("اطلاع", "تراکنشی در این بازه وجود ندارد")
+            return
+
+        filename = f"backup_custom_{from_date.replace('/', '-')}_to_{to_date.replace('/', '-')}.xlsx"
+        filepath = self._create_backup_excel(custom, "بکاپ دلخواه", filename)
+        messagebox.showinfo("موفق", f"✅ بکاپ ذخیره شد!\n\n📁 {filepath}\n📊 {len(custom)} تراکنش\n📅 {from_date} تا {to_date}")
+        self.refresh_backup_history()
 
     def run(self):
         self.root.mainloop()

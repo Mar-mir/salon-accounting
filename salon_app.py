@@ -29,6 +29,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 EMPLOYEES_FILE = os.path.join(DATA_DIR, "employees.xlsx")
 SERVICES_FILE = os.path.join(DATA_DIR, "services.xlsx")
 TRANSACTIONS_FILE = os.path.join(DATA_DIR, "transactions.xlsx")
+CUSTOMERS_FILE = os.path.join(DATA_DIR, "customers.xlsx")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 
 # ─── RTL Helper ───
@@ -211,6 +212,71 @@ class ExcelManager:
         wb.save(SERVICES_FILE)
 
     @staticmethod
+    def init_customers():
+        wb = ExcelManager._ensure_workbook(
+            CUSTOMERS_FILE,
+            ["نام", "تلفن", "تخصص مورد علاقه", "تاریخ عضویت", "تعداد مراجعه", "یادداشت"]
+        )
+
+    @staticmethod
+    def get_customers():
+        if not os.path.exists(CUSTOMERS_FILE):
+            return []
+        wb = load_workbook(CUSTOMERS_FILE)
+        ws = wb.active
+        customers = []
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if row[0]:
+                customers.append({
+                    "name": str(row[0]),
+                    "phone": str(row[1]) if row[1] else "",
+                    "specialty": str(row[2]) if row[2] else "",
+                    "join_date": str(row[3]) if row[3] else "",
+                    "visit_count": int(row[4]) if row[4] else 0,
+                    "note": str(row[5]) if row[5] else "",
+                })
+        return customers
+
+    @staticmethod
+    def save_customers(customers):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "داده‌ها"
+        headers = ["نام", "تلفن", "تخصص مورد علاقه", "تاریخ عضویت", "تعداد مراجعه", "یادداشت"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="E91E63", end_color="E91E63", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+        for cust in customers:
+            ws.append([cust["name"], cust["phone"], cust["specialty"],
+                      cust["join_date"], cust["visit_count"], cust["note"]])
+        wb.save(CUSTOMERS_FILE)
+
+    @staticmethod
+    def export_customers_excel(customers, filepath):
+        """Export customers to a standalone Excel file"""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "دفترچه مشتریان"
+        headers = ["نام", "تلفن", "تخصص مورد علاقه", "تاریخ عضویت", "تعداد مراجعه", "یادداشت"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = Font(bold=True, color="FFFFFF", size=11)
+            cell.fill = PatternFill(start_color="E91E63", end_color="E91E63", fill_type="solid")
+            cell.alignment = Alignment(horizontal="center")
+        for row, cust in enumerate(customers, 2):
+            ws.cell(row=row, column=1, value=cust["name"])
+            ws.cell(row=row, column=2, value=cust["phone"])
+            ws.cell(row=row, column=3, value=cust["specialty"])
+            ws.cell(row=row, column=4, value=cust["join_date"])
+            ws.cell(row=row, column=5, value=cust["visit_count"])
+            ws.cell(row=row, column=6, value=cust["note"])
+        for col in range(1, 7):
+            ws.column_dimensions[get_column_letter(col)].width = 18
+        wb.save(filepath)
+
+    @staticmethod
     def add_transaction(date_str, customer, service, category, employee, amount, note=""):
         wb = load_workbook(TRANSACTIONS_FILE)
         ws = wb.active
@@ -260,6 +326,7 @@ class SalonApp:
         ExcelManager.init_employees()
         ExcelManager.init_services()
         ExcelManager.init_transactions()
+        ExcelManager.init_customers()
 
         self.root = tk.Tk()
         self.root.title("حسابداری سالن آرایش")
@@ -388,11 +455,13 @@ class SalonApp:
         self.tab_reports = ttk.Frame(self.notebook)
         self.tab_monthly = ttk.Frame(self.notebook)
         self.tab_backup = ttk.Frame(self.notebook)
+        self.tab_customers = ttk.Frame(self.notebook)
 
         self.notebook.add(self.tab_main, text="  💰 ثبت تراکنش  ")
         self.notebook.add(self.tab_reports, text="  📊 گزارش امروز  ")
         self.notebook.add(self.tab_monthly, text="  📅 گزارش ماهانه  ")
         self.notebook.add(self.tab_backup, text="  📦 بکاپ  ")
+        self.notebook.add(self.tab_customers, text="  📒 مشتریان  ")
         self.notebook.add(self.tab_employees, text="  👥 کارمندان  ")
         self.notebook.add(self.tab_services, text="  🛎️ خدمات  ")
 
@@ -401,6 +470,7 @@ class SalonApp:
         self.build_reports_tab()
         self.build_monthly_tab()
         self.build_backup_tab()
+        self.build_customers_tab()
         self.build_employees_tab()
         self.build_services_tab()
 
@@ -1043,6 +1113,141 @@ class SalonApp:
             self.refresh_service_table()
             self.refresh_comboboxes()
 
+    # ─── Customers Tab ───
+    def build_customers_tab(self):
+        top = ttk.Frame(self.tab_customers)
+        top.pack(fill="x", padx=15, pady=10)
+
+        ttk.Label(top, text="📒 دفترچه مشتریان", style="Subtitle.TLabel").pack(side="right")
+
+        # Search bar
+        search_frame = ttk.Frame(top)
+        search_frame.pack(side="left", padx=10)
+
+        ttk.Label(search_frame, text="🔍", style="TLabel").pack(side="right", padx=(0, 3))
+        self.customer_search_var = tk.StringVar()
+        self.customer_search_var.trace("w", lambda *args: self.search_customers())
+        search_entry = tk.Entry(search_frame, textvariable=self.customer_search_var,
+                               font=("Tahoma", 11), bg=Theme.ENTRY_BG, fg=Theme.TEXT,
+                               insertbackground=Theme.ACCENT, justify="right", width=20, relief="flat")
+        search_entry.pack(side="right", padx=3)
+
+        # Buttons
+        add_btn = ttk.Button(top, text="➕ افزودن مشتری", style="Accent.TButton",
+                           command=self.add_customer)
+        add_btn.pack(side="left", padx=5)
+
+        edit_btn = ttk.Button(top, text="✏️ ویرایش", style="Secondary.TButton",
+                            command=self.edit_customer)
+        edit_btn.pack(side="left", padx=5)
+
+        del_btn = ttk.Button(top, text="❌ حذف", style="Danger.TButton",
+                           command=self.delete_customer)
+        del_btn.pack(side="left", padx=5)
+
+        export_btn = ttk.Button(top, text="📥 خروجی اکسل", style="Success.TButton",
+                              command=self.export_customers)
+        export_btn.pack(side="left", padx=5)
+
+        # Customer table
+        table_frame = ttk.Frame(self.tab_customers)
+        table_frame.pack(fill="both", expand=True, padx=15, pady=(0, 10))
+
+        cols = ("name", "phone", "specialty", "join_date", "visits", "note")
+        self.cust_tree = ttk.Treeview(table_frame, columns=cols, show="headings", height=18)
+        self.cust_tree.heading("name", text="نام", anchor="e")
+        self.cust_tree.heading("phone", text="تلفن", anchor="e")
+        self.cust_tree.heading("specialty", text="تخصص مورد علاقه", anchor="e")
+        self.cust_tree.heading("join_date", text="تاریخ عضویت", anchor="e")
+        self.cust_tree.heading("visits", text="تعداد مراجعه", anchor="e")
+        self.cust_tree.heading("note", text="یادداشت", anchor="e")
+        self.cust_tree.column("name", width=150, anchor="e")
+        self.cust_tree.column("phone", width=120, anchor="e")
+        self.cust_tree.column("specialty", width=120, anchor="e")
+        self.cust_tree.column("join_date", width=100, anchor="e")
+        self.cust_tree.column("visits", width=80, anchor="e")
+        self.cust_tree.column("note", width=180, anchor="e")
+
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.cust_tree.yview)
+        self.cust_tree.configure(yscrollcommand=scrollbar.set)
+        self.cust_tree.pack(side="right", fill="both", expand=True)
+        scrollbar.pack(side="left", fill="y")
+
+        # Summary
+        summary_frame = ttk.Frame(self.tab_customers)
+        summary_frame.pack(fill="x", padx=15, pady=(0, 5))
+
+        self.cust_summary_var = tk.StringVar(value="مشتریان: ۰ نفر")
+        ttk.Label(summary_frame, textvariable=self.cust_summary_var, style="Dim.TLabel").pack(side="right")
+
+        # Load data
+        self.customers = ExcelManager.get_customers()
+        self.refresh_customer_table()
+
+    def refresh_customer_table(self):
+        self.customers = ExcelManager.get_customers()
+        self.cust_tree.delete(*self.cust_tree.get_children())
+        for cust in self.customers:
+            self.cust_tree.insert("", "end", values=(
+                cust["name"], cust["phone"], cust["specialty"],
+                cust["join_date"], cust["visit_count"], cust["note"]))
+        self.cust_summary_var.set(f"مشتریان: {len(self.customers)} نفر")
+
+    def search_customers(self):
+        query = self.customer_search_var.get().strip().lower()
+        self.cust_tree.delete(*self.cust_tree.get_children())
+        if not query:
+            results = self.customers
+        else:
+            results = [c for c in self.customers if
+                      query in c["name"].lower() or
+                      query in c["phone"] or
+                      query in c["specialty"].lower() or
+                      query in c["note"].lower()]
+        for cust in results:
+            self.cust_tree.insert("", "end", values=(
+                cust["name"], cust["phone"], cust["specialty"],
+                cust["join_date"], cust["visit_count"], cust["note"]))
+        self.cust_summary_var.set(f"نتایج: {len(results)} نفر")
+
+    def add_customer(self):
+        dialog = CustomerDialog(self.root, "افزودن مشتری")
+        if dialog.result:
+            self.customers.append(dialog.result)
+            ExcelManager.save_customers(self.customers)
+            self.refresh_customer_table()
+
+    def edit_customer(self):
+        selected = self.cust_tree.selection()
+        if not selected:
+            messagebox.showwarning("خطا", "مشتری انتخاب نشده")
+            return
+        idx = self.cust_tree.index(selected[0])
+        dialog = CustomerDialog(self.root, "ویرایش مشتری", self.customers[idx])
+        if dialog.result:
+            self.customers[idx] = dialog.result
+            ExcelManager.save_customers(self.customers)
+            self.refresh_customer_table()
+
+    def delete_customer(self):
+        selected = self.cust_tree.selection()
+        if not selected:
+            messagebox.showwarning("خطا", "مشتری انتخاب نشده")
+            return
+        idx = self.cust_tree.index(selected[0])
+        name = self.customers[idx]["name"]
+        if messagebox.askyesno("تأیید", f"آیا از حذف '{name}' اطمینان دارید؟"):
+            self.customers.pop(idx)
+            ExcelManager.save_customers(self.customers)
+            self.refresh_customer_table()
+
+    def export_customers(self):
+        today = PersianDate.today_str()
+        filename = f"customers_{today.replace('/', '-')}.xlsx"
+        filepath = os.path.join(DATA_DIR, filename)
+        ExcelManager.export_customers_excel(self.customers, filepath)
+        messagebox.showinfo("موفق", f"✅ فایل دفترچه مشتریان ذخیره شد!\n\n📁 {filepath}\n👥 {len(self.customers)} مشتری")
+
     # ─── Backup Tab ───
     def build_backup_tab(self):
         top = ttk.Frame(self.tab_backup)
@@ -1576,6 +1781,96 @@ class ServiceDialog:
     def cancel(self):
         self.dialog.destroy()
 
+
+
+class CustomerDialog:
+    def __init__(self, parent, title, customer=None):
+        self.result = None
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title(title)
+        self.dialog.geometry("420x380")
+        self.dialog.configure(bg=Theme.BG)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+
+        frame = ttk.Frame(self.dialog)
+        frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ttk.Label(frame, text="نام:", style="TLabel").pack(anchor="e", pady=(0, 3))
+        self.name_entry = tk.Entry(frame, font=("Tahoma", 12), bg=Theme.ENTRY_BG,
+                                  fg=Theme.TEXT, insertbackground=Theme.ACCENT,
+                                  justify="right", relief="flat")
+        self.name_entry.pack(fill="x", pady=(0, 10))
+
+        ttk.Label(frame, text="تلفن:", style="TLabel").pack(anchor="e", pady=(0, 3))
+        self.phone_entry = tk.Entry(frame, font=("Tahoma", 12), bg=Theme.ENTRY_BG,
+                                   fg=Theme.TEXT, insertbackground=Theme.ACCENT,
+                                   justify="right", relief="flat")
+        self.phone_entry.pack(fill="x", pady=(0, 10))
+
+        ttk.Label(frame, text="تخصص مورد علاقه:", style="TLabel").pack(anchor="e", pady=(0, 3))
+        self.specialty_var = tk.StringVar()
+        self.specialty_combo = ttk.Combobox(frame, textvariable=self.specialty_var,
+                                            values=["مو", "ناخن", "ابرو", "مژه", "صورت", "رنگ", "شینیون"],
+                                            font=("Tahoma", 11), state="readonly")
+        self.specialty_combo.pack(fill="x", pady=(0, 10))
+
+        ttk.Label(frame, text="تعداد مراجعه:", style="TLabel").pack(anchor="e", pady=(0, 3))
+        self.visits_entry = tk.Entry(frame, font=("Tahoma", 12), bg=Theme.ENTRY_BG,
+                                    fg=Theme.TEXT, insertbackground=Theme.ACCENT,
+                                    justify="right", relief="flat")
+        self.visits_entry.pack(fill="x", pady=(0, 10))
+
+        ttk.Label(frame, text="یادداشت:", style="TLabel").pack(anchor="e", pady=(0, 3))
+        self.note_entry = tk.Entry(frame, font=("Tahoma", 12), bg=Theme.ENTRY_BG,
+                                  fg=Theme.TEXT, insertbackground=Theme.ACCENT,
+                                  justify="right", relief="flat")
+        self.note_entry.pack(fill="x", pady=(0, 10))
+
+        # Pre-fill if editing
+        if customer:
+            self.name_entry.insert(0, customer["name"])
+            self.phone_entry.insert(0, customer["phone"])
+            self.specialty_var.set(customer["specialty"])
+            self.visits_entry.insert(0, str(customer["visit_count"]))
+            self.note_entry.insert(0, customer["note"])
+        else:
+            self.visits_entry.insert(0, "0")
+
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(fill="x", pady=(10, 0))
+
+        ttk.Button(btn_frame, text="ذخیره", style="Success.TButton",
+                  command=self.save).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="لغو", style="Secondary.TButton",
+                  command=self.cancel).pack(side="left", padx=5)
+
+        self.dialog.wait_window()
+
+    def save(self):
+        name = self.name_entry.get().strip()
+        if not name:
+            messagebox.showwarning("خطا", "نام الزامی است")
+            return
+
+        try:
+            visits = int(self.visits_entry.get().strip() or "0")
+        except ValueError:
+            messagebox.showwarning("خطا", "تعداد مراجعه باید عدد باشد")
+            return
+
+        self.result = {
+            "name": name,
+            "phone": self.phone_entry.get().strip(),
+            "specialty": self.specialty_var.get(),
+            "join_date": PersianDate.today_str(),
+            "visit_count": visits,
+            "note": self.note_entry.get().strip(),
+        }
+        self.dialog.destroy()
+
+    def cancel(self):
+        self.dialog.destroy()
 
 # ─── Run ───
 if __name__ == "__main__":

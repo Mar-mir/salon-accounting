@@ -1115,6 +1115,9 @@ class SalonApp:
 
     # ─── Customers Tab ───
     def build_customers_tab(self):
+        # Initialize customers list FIRST (before widgets that use trace)
+        self.customers = ExcelManager.get_customers()
+
         top = ttk.Frame(self.tab_customers)
         top.pack(fill="x", padx=15, pady=10)
 
@@ -1180,8 +1183,6 @@ class SalonApp:
         self.cust_summary_var = tk.StringVar(value="مشتریان: ۰ نفر")
         ttk.Label(summary_frame, textvariable=self.cust_summary_var, style="Dim.TLabel").pack(side="right")
 
-        # Load data
-        self.customers = ExcelManager.get_customers()
         self.refresh_customer_table()
 
     def refresh_customer_table(self):
@@ -1194,6 +1195,8 @@ class SalonApp:
         self.cust_summary_var.set(f"مشتریان: {len(self.customers)} نفر")
 
     def search_customers(self):
+        if not hasattr(self, 'customers') or not self.customers:
+            return
         query = self.customer_search_var.get().strip().lower()
         self.cust_tree.delete(*self.cust_tree.get_children())
         if not query:

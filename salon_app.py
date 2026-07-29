@@ -1070,26 +1070,31 @@ class SalonApp:
         ttk.Button(btn_row1, text="📦 بکاپ کامل\n(همه داده‌ها)", style="Success.TButton",
                   command=self.backup_full).pack(side="right", padx=5, ipady=10)
 
-        # ── Custom Date Range ──
-        custom_frame = ttk.LabelFrame(main_frame, text=" بکاپ با بازه دلخواه ", style="Card.TFrame")
+        # ── Custom Date Range (Shamsi Picker) ──
+        custom_frame = ttk.LabelFrame(main_frame, text=" بکاپ با بازه دلخواه (شمسی) ", style="Card.TFrame")
         custom_frame.pack(fill="x", pady=(0, 15))
 
         custom_row = ttk.Frame(custom_frame, style="Card.TFrame")
         custom_row.pack(fill="x", padx=10, pady=10)
 
-        ttk.Label(custom_row, text="از:", style="Card.TLabel").pack(side="right", padx=(0, 3))
-        self.backup_from = tk.Entry(custom_row, font=("Tahoma", 11), bg=Theme.ENTRY_BG,
-                                   fg=Theme.TEXT, insertbackground=Theme.ACCENT,
-                                   justify="right", width=12, relief="flat")
-        self.backup_from.pack(side="right", padx=3)
-        self.backup_from.insert(0, PersianDate.today_str())
+        # Get today's Shamsi date for defaults
+        now = datetime.now()
+        today_jy, today_jm, today_jd = PersianDate.gregorian_to_jalali(now.year, now.month, now.day)
 
-        ttk.Label(custom_row, text="تا:", style="Card.TLabel").pack(side="right", padx=(10, 3))
-        self.backup_to = tk.Entry(custom_row, font=("Tahoma", 11), bg=Theme.ENTRY_BG,
-                                  fg=Theme.TEXT, insertbackground=Theme.ACCENT,
-                                  justify="right", width=12, relief="flat")
-        self.backup_to.pack(side="right", padx=3)
-        self.backup_to.insert(0, PersianDate.today_str())
+        # ── From date ──
+        ttk.Label(custom_row, text="از:", style="Card.TLabel").pack(side="right", padx=(0, 3))
+        self.from_year = tk.StringVar(value=str(today_jy))
+        self.from_month = tk.StringVar(value=f"{today_jm:02d}")
+        self.from_day = tk.StringVar(value=f"{today_jd:02d}")
+
+        self._make_shamsi_picker(custom_row, self.from_year, self.from_month, self.from_day)
+
+        ttk.Label(custom_row, text="   تا:", style="Card.TLabel").pack(side="right", padx=(15, 3))
+        self.to_year = tk.StringVar(value=str(today_jy))
+        self.to_month = tk.StringVar(value=f"{today_jm:02d}")
+        self.to_day = tk.StringVar(value=f"{today_jd:02d}")
+
+        self._make_shamsi_picker(custom_row, self.to_year, self.to_month, self.to_day)
 
         ttk.Button(custom_row, text="📥 خروجی بازه دلخواه", style="Accent.TButton",
                   command=self.backup_custom_range).pack(side="right", padx=10)
@@ -1225,6 +1230,34 @@ class SalonApp:
         else:
             return f"{size // (1024 * 1024)} MB"
 
+    def _make_shamsi_picker(self, parent, year_var, month_var, day_var):
+        """Create a Shamsi date picker with 3 spinboxes (YYYY/MM/DD)"""
+        font = ("Tahoma", 11)
+        bg = Theme.ENTRY_BG
+        fg = Theme.TEXT
+
+        # Year
+        y_spin = tk.Spinbox(parent, from_=1380, to=1420, textvariable=year_var,
+                           font=font, bg=bg, fg=fg, buttonbackground=Theme.BTN_SECONDARY,
+                           width=5, justify="center", relief="flat")
+        y_spin.pack(side="right", padx=2)
+
+        ttk.Label(parent, text="/", style="Card.TLabel").pack(side="right")
+
+        # Month
+        m_spin = tk.Spinbox(parent, from_=1, to=12, textvariable=month_var,
+                           font=font, bg=bg, fg=fg, buttonbackground=Theme.BTN_SECONDARY,
+                           width=3, justify="center", relief="flat", format="%02.0f")
+        m_spin.pack(side="right", padx=2)
+
+        ttk.Label(parent, text="/", style="Card.TLabel").pack(side="right")
+
+        # Day
+        d_spin = tk.Spinbox(parent, from_=1, to=31, textvariable=day_var,
+                           font=font, bg=bg, fg=fg, buttonbackground=Theme.BTN_SECONDARY,
+                           width=3, justify="center", relief="flat", format="%02.0f")
+        d_spin.pack(side="right", padx=2)
+
     def refresh_backup_history(self):
         """Refresh the backup history list"""
         self.backup_tree.delete(*self.backup_tree.get_children())
@@ -1234,7 +1267,9 @@ class SalonApp:
                 if f.startswith("backup_") and f.endswith(".xlsx"):
                     filepath = os.path.join(DATA_DIR, f)
                     stat = os.stat(filepath)
-                    date_str = datetime.fromtimestamp(stat.st_mtime).strftime("%Y/%m/%d %H:%M")
+                    dt = datetime.fromtimestamp(stat.st_mtime)
+                    jy, jm, jd = PersianDate.gregorian_to_jalali(dt.year, dt.month, dt.day)
+                    date_str = f"{jy}/{jm:02d}/{jd:02d}  {dt.strftime('%H:%M')}"
                     # Determine type from filename
                     if "_daily_" in f:
                         btype = "روزانه"
@@ -1328,8 +1363,8 @@ class SalonApp:
 
     def backup_custom_range(self):
         """Backup with custom date range"""
-        from_date = self.backup_from.get().strip()
-        to_date = self.backup_to.get().strip()
+        from_date = f"{self.from_year.get()}/{self.from_month.get()}/{self.from_day.get()}"
+        to_date = f"{self.to_year.get()}/{self.to_month.get()}/{self.to_day.get()}"
 
         if not from_date or not to_date:
             messagebox.showwarning("خطا", "تاریخ شروع و پایان را وارد کنید")

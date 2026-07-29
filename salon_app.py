@@ -53,23 +53,23 @@ def to_toman_short(amount):
 
 # ─── Color Theme ───
 class Theme:
-    BG = "#1a1a2e"
-    BG_LIGHT = "#16213e"
-    BG_CARD = "#0f3460"
-    ACCENT = "#e94560"
-    ACCENT_LIGHT = "#ff6b6b"
-    TEXT = "#ffffff"
-    TEXT_DIM = "#a0a0b0"
-    SUCCESS = "#2ecc71"
-    WARNING = "#f39c12"
-    DANGER = "#e74c3c"
-    ENTRY_BG = "#233554"
-    BTN_PRIMARY = "#e94560"
-    BTN_SECONDARY = "#0f3460"
-    BTN_HOVER = "#ff6b6b"
-    TREE_BG = "#16213e"
-    TREE_SELECT = "#e94560"
-    TREE_ALT = "#1a1a3e"
+    BG = "#fce4ec"
+    BG_LIGHT = "#f8bbd0"
+    BG_CARD = "#ffffff"
+    ACCENT = "#e91e63"
+    ACCENT_LIGHT = "#f06292"
+    TEXT = "#4a148c"
+    TEXT_DIM = "#7b1fa2"
+    SUCCESS = "#2e7d32"
+    WARNING = "#e65100"
+    DANGER = "#c62828"
+    ENTRY_BG = "#fce4ec"
+    BTN_PRIMARY = "#e91e63"
+    BTN_SECONDARY = "#f8bbd0"
+    BTN_HOVER = "#f06292"
+    TREE_BG = "#ffffff"
+    TREE_SELECT = "#f48fb1"
+    TREE_ALT = "#fce4ec"
 
 
 # ─── Default Data ───
@@ -114,7 +114,7 @@ class ExcelManager:
             for col, header in enumerate(headers, 1):
                 cell = ws.cell(row=1, column=col, value=header)
                 cell.font = Font(bold=True, color="FFFFFF")
-                cell.fill = PatternFill(start_color="E94560", end_color="E94560", fill_type="solid")
+                cell.fill = PatternFill(start_color="E91E63", end_color="E91E63", fill_type="solid")
                 cell.alignment = Alignment(horizontal="center")
             wb.save(filepath)
         return load_workbook(filepath)

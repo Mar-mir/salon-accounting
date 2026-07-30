@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="color:#e91e63;margin-bottom:15px">🛎️ مدیریت خدمات</h2>
+
+<div id="modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:25px;width:400px;max-width:90vw">
+    <h3 id="modal_title" style="color:#e91e63;margin-bottom:15px">افزودن خدمت</h3>
+    <form method="POST">
+      <input type="hidden" name="action" id="f_action" value="add">
+      <input type="hidden" name="idx" id="f_idx" value="">
+      <div style="margin-bottom:10px"><label>نام خدمت *</label><input name="name" id="f_name" required></div>
+      <div style="margin-bottom:10px"><label>دسته‌بندی</label>
+        <select name="category" id="f_category"><option value="">---</option><option>مو</option><option>ناخن</option><option>ابرو</option><option>مژه</option><option>صورت</option></select>
+      </div>
+      <div style="margin-bottom:15px"><label>قیمت پیش‌فرض (تومان)</label><input type="number" name="price" id="f_price" min="0"></div>
+      <div style="display:flex;gap:8px"><button type="submit" class="btn btn-success">ذخیره</button><button type="button" class="btn btn-secondary" onclick="closeModal()">لغو</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <table>
+    <thead><tr><th>نام خدمت</th><th>دسته‌بندی</th><th>قیمت پیش‌فرض</th><th>عملیات</th></tr></thead>
+    <tbody>
+    {% for s in services %}
+    <tr>
+      <td>{{ s.name }}</td><td>{{ s.category }}</td><td>{{ "{:,}".format(s.default_price) }} تومان</td>
+      <td>
+        <button class="btn btn-secondary" style="padding:3px 8px;font-size:11px" onclick="editSvc({{ loop.index0 }},'{{ s.name }}','{{ s.category }}',{{ s.default_price }})">✏️</button>
+        <form method="POST" style="display:inline" onsubmit="return confirm('حذف {{ s.name }}؟')">
+          <input type="hidden" name="action" value="delete"><input type="hidden" name="idx" value="{{ loop.index0 }}">
+          <button class="btn btn-danger" style="padding:3px 8px;font-size:11px">❌</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not services %}<div class="empty">خدمتی ثبت نشده</div>{% endif %}
+</div>
+
+<button class="btn btn-primary" style="position:fixed;bottom:20px;left:20px;font-size:15px;padding:12px 20px;border-radius:50px" onclick="openAdd()">➕ افزودن خدمت</button>
+
+<script>
+function openAdd(){
+  document.getElementById('f_action').value='add';
+  document.getElementById('modal_title').textContent='افزودن خدمت';
+  document.getElementById('f_name').value='';document.getElementById('f_category').value='';
+  document.getElementById('f_price').value='';document.getElementById('f_idx').value='';
+  document.getElementById('modal').style.display='flex';
+}
+function editSvc(i,name,cat,price){
+  document.getElementById('f_action').value='edit';
+  document.getElementById('modal_title').textContent='ویرایش خدمت';
+  document.getElementById('f_idx').value=i;
+  document.getElementById('f_name').value=name;document.getElementById('f_category').value=cat;
+  document.getElementById('f_price').value=price;
+  document.getElementById('modal').style.display='flex';
+}
+function closeModal(){document.getElementById('modal').style.display='none';}
+</script>
+{% endblock %}

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="color:#e91e63;margin-bottom:15px">📒 دفترچه مشتریان</h2>
+
+<div class="card">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <form method="GET" style="display:flex;gap:8px;align-items:center">
+      <input name="q" value="{{ query }}" placeholder="🔍 جستجو..." style="width:220px">
+      <button type="submit" class="btn btn-secondary">جستجو</button>
+    </form>
+    <a href="/customers/export" class="btn btn-success">📥 خروجی اکسل</a>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:200;display:none;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;padding:25px;width:400px;max-width:90vw">
+    <h3 id="modal_title" style="color:#e91e63;margin-bottom:15px">افزودن مشتری</h3>
+    <form method="POST">
+      <input type="hidden" name="action" id="f_action" value="add">
+      <input type="hidden" name="idx" id="f_idx" value="">
+      <div style="margin-bottom:10px"><label>نام *</label><input name="name" id="f_name" required></div>
+      <div style="margin-bottom:10px"><label>تلفن</label><input name="phone" id="f_phone"></div>
+      <div style="margin-bottom:10px"><label>تخصص مورد علاقه</label>
+        <select name="specialty" id="f_specialty"><option value="">---</option><option>مو</option><option>ناخن</option><option>ابرو</option><option>مژه</option><option>صورت</option><option>رنگ</option><option>شینیون</option></select>
+      </div>
+      <div style="margin-bottom:10px"><label>تعداد مراجعه</label><input type="number" name="visits" id="f_visits" value="0"></div>
+      <div style="margin-bottom:15px"><label>یادداشت</label><input name="note" id="f_note"></div>
+      <div style="display:flex;gap:8px"><button type="submit" class="btn btn-success">ذخیره</button><button type="button" class="btn btn-secondary" onclick="closeModal()">لغو</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <table>
+    <thead><tr><th>نام</th><th>تلفن</th><th>تخصص</th><th>تاریخ عضویت</th><th>مراجعه</th><th>یادداشت</th><th>عملیات</th></tr></thead>
+    <tbody>
+    {% for c in customers %}
+    <tr>
+      <td>{{ c.name }}</td><td>{{ c.phone }}</td><td>{{ c.specialty }}</td><td>{{ c.join_date }}</td><td>{{ c.visit_count }}</td><td>{{ c.note }}</td>
+      <td>
+        <button class="btn btn-secondary" style="padding:3px 8px;font-size:11px" onclick="editCust({{ loop.index0 }},'{{ c.name }}','{{ c.phone }}','{{ c.specialty }}',{{ c.visit_count }},'{{ c.note }}')">✏️</button>
+        <form method="POST" style="display:inline" onsubmit="return confirm('آیا از حذف {{ c.name }} اطمینان دارید؟')">
+          <input type="hidden" name="action" value="delete"><input type="hidden" name="idx" value="{{ loop.index0 }}">
+          <button class="btn btn-danger" style="padding:3px 8px;font-size:11px">❌</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if not customers %}<div class="empty">مشتری ثبت نشده</div>{% endif %}
+  <div style="margin-top:10px;font-size:12px;color:#7b1fa2">مشتریان: {{ customers|length }} نفر</div>
+</div>
+
+<button class="btn btn-primary" style="position:fixed;bottom:20px;left:20px;font-size:15px;padding:12px 20px;border-radius:50px" onclick="openAdd()">➕ افزودن مشتری</button>
+
+<script>
+const custs = {{ customers | tojson }};
+function openAdd(){
+  document.getElementById('f_action').value='add';
+  document.getElementById('modal_title').textContent='افزودن مشتری';
+  document.getElementById('f_name').value='';document.getElementById('f_phone').value='';
+  document.getElementById('f_specialty').value='';document.getElementById('f_visits').value='0';
+  document.getElementById('f_note').value='';document.getElementById('f_idx').value='';
+  document.getElementById('modal').style.display='flex';
+}
+function editCust(i,name,phone,spec,visits,note){
+  document.getElementById('f_action').value='edit';
+  document.getElementById('modal_title').textContent='ویرایش مشتری';
+  document.getElementById('f_idx').value=i;
+  document.getElementById('f_name').value=name;document.getElementById('f_phone').value=phone;
+  document.getElementById('f_specialty').value=spec;document.getElementById('f_visits').value=visits;
+  document.getElementById('f_note').value=note;
+  document.getElementById('modal').style.display='flex';
+}
+function closeModal(){document.getElementById('modal').style.display='none';}
+</script>
+{% endblock %}

@@ -1,0 +1,31 @@
+name: Build Windows EXE
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller openpyxl
+
+      - name: Build EXE
+        run: |
+          pyinstaller --onefile --windowed --name "SalonAccounting" salon_app.py
+
+      - name: Upload EXE to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/SalonAccounting.exe
+          tag_name: ${{ github.ref_name }}

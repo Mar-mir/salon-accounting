@@ -1,40 +1,74 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 style="color:#e91e63;margin-bottom:15px">📦 بکاپ و خروجی اکسل</h2>
+<div class="page-header">
+  <h2>📦 بکاپ و خروجی اکسل</h2>
+</div>
 
 <div class="card">
-  <h2>بکاپ سریع</h2>
-  <form method="POST" style="display:flex;gap:10px;flex-wrap:wrap">
-    <button name="action" value="daily" class="btn btn-primary" style="padding:12px 16px">📅 بکاپ روزانه<br><small>امروز</small></button>
-    <button name="action" value="weekly" class="btn btn-primary" style="padding:12px 16px">📆 بکاپ هفتگی<br><small>۷ روز اخیر</small></button>
-    <button name="action" value="monthly" class="btn btn-primary" style="padding:12px 16px">🗓️ بکاپ ماهانه<br><small>این ماه</small></button>
-    <button name="action" value="full" class="btn btn-success" style="padding:12px 16px">📦 بکاپ کامل<br><small>همه داده‌ها</small></button>
+  <h2>⚡ بکاپ سریع</h2>
+  <form method="POST" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+    <button name="action" value="daily" class="btn btn-primary" style="padding:16px;flex-direction:column;gap:4px">
+      <span style="font-size:16px">📅</span>
+      <span>بکاپ روزانه</span>
+      <small style="font-weight:400;opacity:.8">فقط امروز</small>
+    </button>
+    <button name="action" value="weekly" class="btn btn-primary" style="padding:16px;flex-direction:column;gap:4px">
+      <span style="font-size:16px">📆</span>
+      <span>بکاپ هفتگی</span>
+      <small style="font-weight:400;opacity:.8">۷ روز اخیر</small>
+    </button>
+    <button name="action" value="monthly" class="btn btn-primary" style="padding:16px;flex-direction:column;gap:4px">
+      <span style="font-size:16px">🗓️</span>
+      <span>بکاپ ماهانه</span>
+      <small style="font-weight:400;opacity:.8">این ماه</small>
+    </button>
+    <button name="action" value="full" class="btn btn-success" style="padding:16px;flex-direction:column;gap:4px">
+      <span style="font-size:16px">📦</span>
+      <span>بکاپ کامل</span>
+      <small style="font-weight:400;opacity:.8">همه داده‌ها</small>
+    </button>
   </form>
 </div>
 
 <div class="card">
-  <h2>بکاپ با بازه دلخواه (شمسی)</h2>
-  <form method="POST" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+  <h2>📆 بکاپ با بازه دلخواه (شمسی)</h2>
+  <form method="POST" style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
     <input type="hidden" name="action" value="custom">
-    <div class="field" style="max-width:180px"><label>از:</label><input name="from_date" placeholder="1404/01/01" value="{{ today }}"></div>
-    <div class="field" style="max-width:180px"><label>تا:</label><input name="to_date" placeholder="1404/01/31" value="{{ today }}"></div>
+    <div class="field" style="max-width:200px">
+      <label>از تاریخ</label>
+      <input name="from_date" placeholder="1404/01/01" value="{{ today }}" style="text-align:center;font-weight:600">
+    </div>
+    <div class="field" style="max-width:200px">
+      <label>تا تاریخ</label>
+      <input name="to_date" placeholder="1404/01/31" value="{{ today }}" style="text-align:center;font-weight:600">
+    </div>
     <button type="submit" class="btn btn-primary">📥 خروجی بازه دلخواه</button>
   </form>
 </div>
 
 <div class="card">
-  <h2>تاریخچه بکاپ‌ها</h2>
-  <table>
-    <thead><tr><th>نام فایل</th><th>تاریخ ایجاد</th><th>حجم</th><th>دانلود</th></tr></thead>
-    <tbody>
-    {% for b in backups %}
-    <tr>
-      <td>{{ b.filename }}</td><td>{{ b.date }}</td><td>{{ b.size }}</td>
-      <td><a href="/download/{{ b.filename }}" class="btn btn-secondary" style="padding:3px 10px;font-size:11px">📥 دانلود</a></td>
-    </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% if not backups %}<div class="empty">بکاپی وجود ندارد</div>{% endif %}
+  <h2>📂 تاریخچه بکاپ‌ها</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>نام فایل</th><th>تاریخ ایجاد</th><th>حجم</th><th>دانلود</th></tr></thead>
+      <tbody>
+      {% for b in backups %}
+      <tr>
+        <td style="color:var(--pink-300);font-weight:700">{{ loop.index }}</td>
+        <td style="font-weight:600;font-size:12px">{{ b.filename }}</td>
+        <td>{{ b.date }}</td>
+        <td style="font-weight:700;color:var(--green)">{{ b.size }}</td>
+        <td><a href="/download/{{ b.filename }}" class="btn btn-primary" style="padding:5px 14px;font-size:11px">📥 دانلود</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if not backups %}
+  <div class="empty">
+    <span class="icon">📭</span>
+    بکاپی وجود ندارد
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

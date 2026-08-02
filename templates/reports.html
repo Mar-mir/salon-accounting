@@ -1,23 +1,58 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 style="color:#e91e63;margin-bottom:15px">📊 گزارش امروز — {{ today }}</h2>
+<div class="page-header">
+  <h2>📊 گزارش امروز</h2>
+  <span style="color:var(--purple-600);font-size:13px">📅 {{ today }}</span>
+</div>
 
 <div class="summary">
-  <div class="box"><div class="label">💰 جمع کل امروز</div><div class="value green">{{ "{:,}".format(total) }}</div></div>
-  <div class="box"><div class="label">👥 تعداد مشتری</div><div class="value">{{ customers }}</div></div>
-  <div class="box"><div class="label">🛎️ تعداد خدمات</div><div class="value">{{ services_count }}</div></div>
-  <div class="box"><div class="label">💸 پورسانت کارمندان</div><div class="value orange">{{ "{:,}".format(commission) }}</div></div>
+  <div class="box">
+    <div class="label">💰 جمع کل</div>
+    <div class="value green">{{ "{:,}".format(total) }}</div>
+    <div style="font-size:11px;color:var(--purple-600);margin-top:2px">تومان</div>
+  </div>
+  <div class="box">
+    <div class="label">👥 مشتری</div>
+    <div class="value">{{ customers }}</div>
+    <div style="font-size:11px;color:var(--purple-600);margin-top:2px">نفر</div>
+  </div>
+  <div class="box">
+    <div class="label">🛎️ خدمت</div>
+    <div class="value">{{ services_count }}</div>
+    <div style="font-size:11px;color:var(--purple-600);margin-top:2px">مورد</div>
+  </div>
+  <div class="box">
+    <div class="label">💸 پورسانت</div>
+    <div class="value orange">{{ "{:,}".format(commission) }}</div>
+    <div style="font-size:11px;color:var(--purple-600);margin-top:2px">تومان</div>
+  </div>
 </div>
 
 <div class="card">
-  <table>
-    <thead><tr><th>تاریخ</th><th>مشتری</th><th>خدمت</th><th>دسته</th><th>کارمند</th><th>مبلغ</th><th>پورسانت</th></tr></thead>
-    <tbody>
-    {% for t in transactions %}
-    <tr><td>{{ t.date }}</td><td>{{ t.customer }}</td><td>{{ t.service }}</td><td>{{ t.category }}</td><td>{{ t.employee }}</td><td>{{ "{:,}".format(t.amount) }}</td><td>{{ "{:,}".format(t.commission) }}</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% if not transactions %}<div class="empty">تراکنشی برای امروز ثبت نشده</div>{% endif %}
+  <h2>📋 لیست تراکنش‌ها</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>مشتری</th><th>خدمت</th><th>دسته</th><th>کارمند</th><th>مبلغ</th><th>پورسانت</th></tr></thead>
+      <tbody>
+      {% for t in transactions %}
+      <tr>
+        <td style="color:var(--pink-300);font-weight:700">{{ loop.index }}</td>
+        <td style="font-weight:600">{{ t.customer }}</td>
+        <td>{{ t.service }}</td>
+        <td><span style="background:var(--pink-50);padding:2px 8px;border-radius:20px;font-size:11px;color:var(--pink-700)">{{ t.category }}</span></td>
+        <td>{{ t.employee }}</td>
+        <td style="font-weight:700;color:var(--green)">{{ "{:,}".format(t.amount) }}</td>
+        <td style="color:var(--orange);font-weight:600">{{ "{:,}".format(t.commission) }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if not transactions %}
+  <div class="empty">
+    <span class="icon">📭</span>
+    تراکنشی برای امروز ثبت نشده
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

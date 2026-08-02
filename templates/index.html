@@ -1,56 +1,84 @@
 {% extends "base.html" %}
 {% block content %}
-<h2 style="color:#e91e63;margin-bottom:15px">💇‍♀️ حسابداری سالن آرایش — {{ today }}</h2>
+<div class="page-header">
+  <h2>💇‍♀️ ثبت تراکنش جدید</h2>
+  <span style="color:var(--purple-600);font-size:13px">📅 {{ today }}</span>
+</div>
 
 <form method="POST" action="/submit_transaction">
 <div class="card">
-  <h2>اطلاعات مشتری</h2>
+  <h2>👤 اطلاعات مشتری</h2>
   <div class="form-row">
-    <div class="field"><label>نام مشتری *</label><input name="customer_name" required placeholder="نام مشتری"></div>
-    <div class="field"><label>📱 تلفن</label><input name="customer_phone" placeholder="شماره تلفن"></div>
+    <div class="field">
+      <label>نام مشتری *</label>
+      <input name="customer_name" required placeholder="نام مشتری را وارد کنید" style="font-size:15px;padding:12px 16px">
+    </div>
+    <div class="field" style="max-width:220px">
+      <label>📱 تلفن</label>
+      <input name="customer_phone" placeholder="شماره تلفن" dir="ltr" style="text-align:center">
+    </div>
   </div>
 </div>
 
 <div class="card">
-  <h2>خدمات انجام شده</h2>
+  <h2>🛎️ خدمات انجام شده</h2>
   <div id="items_list"></div>
-  <div class="form-row" style="margin-top:10px">
-    <div class="field"><label>خدمت</label>
-      <select id="svc_select" onchange="fillPrice()">
-        {% for s in services %}<option value="{{ s.name }}" data-price="{{ s.default_price }}">{{ s.name }} - {{ "{:,}".format(s.default_price) }} تومان</option>{% endfor %}
+  <div class="form-row" style="margin-top:14px">
+    <div class="field">
+      <label>خدمت</label>
+      <select id="svc_select" onchange="fillPrice()" style="font-size:14px">
+        {% for s in services %}<option value="{{ s.name }}" data-price="{{ s.default_price }}">{{ s.name }} — {{ "{:,}".format(s.default_price) }} تومان</option>{% endfor %}
       </select>
     </div>
-    <div class="field"><label>کارمند</label>
-      <select id="emp_select">
-        {% for e in employees %}<option value="{{ e.name }} ({{ e.specialty }})">{{ e.name }} ({{ e.specialty }})</option>{% endfor %}
+    <div class="field">
+      <label>کارمند</label>
+      <select id="emp_select" style="font-size:14px">
+        {% for e in employees %}<option value="{{ e.name }} ({{ e.specialty }})">{{ e.name }} — {{ e.specialty }}</option>{% endfor %}
       </select>
     </div>
-    <div class="field" style="max-width:160px"><label>مبلغ (تومان)</label><input type="number" id="amt_input" min="0"></div>
-    <div><label>&nbsp;</label><button type="button" class="btn btn-primary" onclick="addItem()">➕ افزودن</button></div>
+    <div class="field" style="max-width:180px">
+      <label>مبلغ (تومان)</label>
+      <input type="number" id="amt_input" min="0" placeholder="0" style="font-size:16px;font-weight:700;text-align:center">
+    </div>
+    <div style="padding-top:22px">
+      <button type="button" class="btn btn-primary" onclick="addItem()" style="padding:12px 24px;font-size:14px">
+        ➕ افزودن
+      </button>
+    </div>
   </div>
 
-  <table style="margin-top:10px" id="items_table">
-    <thead><tr><th>خدمت</th><th>کارمند</th><th>مبلغ</th><th>حذف</th></tr></thead>
-    <tbody id="items_tbody"></tbody>
-  </table>
+  <div class="table-wrap" style="margin-top:14px">
+    <table id="items_table">
+      <thead><tr><th>#</th><th>خدمت</th><th>کارمند</th><th>مبلغ</th><th></th></tr></thead>
+      <tbody id="items_tbody"></tbody>
+    </table>
+  </div>
 
-  <div style="text-align:left;margin-top:10px">
-    <span style="font-size:18px;font-weight:bold;color:#2e7d32">جمع کل: <span id="total_display">۰</span> تومان</span>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:18px;padding:14px 18px;background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border-radius:var(--radius-sm);border:1px solid #a5d6a7">
+    <span style="font-size:14px;color:var(--green);font-weight:600">جمع کل</span>
+    <span style="font-size:24px;font-weight:800;color:var(--green)" id="total_display">۰ تومان</span>
   </div>
 </div>
 
-<div style="display:flex;gap:10px;margin-top:10px">
-  <button type="submit" class="btn btn-success" style="font-size:15px;padding:12px 30px">✅ ثبت نهایی</button>
-  <button type="button" class="btn btn-secondary" onclick="clearAll()">🗑️ پاک کردن</button>
+<div style="display:flex;gap:12px;margin-top:14px">
+  <button type="submit" class="btn btn-success" style="font-size:16px;padding:14px 40px">
+    ✅ ثبت نهایی
+  </button>
+  <button type="button" class="btn btn-secondary" onclick="clearAll()" style="padding:14px 24px">
+    🗑️ پاک کردن
+  </button>
 </div>
 </form>
+{% endblock %}
 
+{% block scripts %}
 <script>
 let items = [];
 function fillPrice(){
   let s = document.getElementById('svc_select');
   let p = s.options[s.selectedIndex].getAttribute('data-price');
   document.getElementById('amt_input').value = p;
+  document.getElementById('amt_input').focus();
 }
 function addItem(){
   let svc = document.getElementById('svc_select');
@@ -59,6 +87,8 @@ function addItem(){
   if(!amt || parseInt(amt)<=0){alert('لطفاً مبلغ وارد کنید');return;}
   items.push({service:svc.value, employee:emp.value, amount:parseInt(amt)});
   renderItems();
+  document.getElementById('amt_input').value = '';
+  document.getElementById('amt_input').focus();
 }
 function removeItem(i){
   items.splice(i,1);
@@ -70,18 +100,24 @@ function renderItems(){
   let html = '';
   items.forEach((it,i)=>{
     total += it.amount;
-    html += '<tr><td>'+it.service+'</td><td>'+it.employee.split(' (')[0]+'</td><td>'+it.amount.toLocaleString()+'</td><td><button type="button" class="btn btn-danger" onclick="removeItem('+i+')" style="padding:3px 8px">❌</button></td></tr>';
+    html += '<tr style="animation:slideIn .3s ease">';
+    html += '<td style="color:var(--pink-300);font-weight:700">'+(i+1)+'</td>';
+    html += '<td style="font-weight:600">'+it.service+'</td>';
+    html += '<td>'+it.employee.split(' (')[0]+'</td>';
+    html += '<td style="font-weight:700;color:var(--green)">'+it.amount.toLocaleString()+' تومان</td>';
+    html += '<td><button type="button" class="btn btn-danger" onclick="removeItem('+i+')" style="padding:4px 10px;font-size:11px">❌</button></td>';
+    html += '</tr>';
     html += '<input type="hidden" name="service[]" value="'+it.service+'">';
     html += '<input type="hidden" name="employee[]" value="'+it.employee+'">';
     html += '<input type="hidden" name="amount[]" value="'+it.amount+'">';
   });
   tb.innerHTML = html;
-  document.getElementById('total_display').textContent = total.toLocaleString();
+  document.getElementById('total_display').textContent = total.toLocaleString() + ' تومان';
 }
 function clearAll(){
   items = [];
   renderItems();
-  document.getElementById('total_display').textContent = '۰';
+  document.getElementById('total_display').textContent = '۰ تومان';
 }
 fillPrice();
 </script>

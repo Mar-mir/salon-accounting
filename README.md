@@ -31,18 +31,9 @@ python web_app.py
 
 ### روش ۲: فایل اجرایی ویندوز (.exe)
 
-```bash
-# نصب پیش‌نیاز (روی ویندوز)
-pip install pyinstaller openpyxl
+فایل اجرایی آماده از **[ریلیزها](https://github.com/Mar-mir/salon-accounting/releases/latest)** دانلود کنید.
 
-# ساخت فایل اجرایی
-bash build_exe.sh
-# یا مستقیم:
-pyinstaller --onefile --windowed --name "حسابداری_سالن" salon_app.py
-```
-
-خروجی: فایل `dist/حسابداری_سالن.exe`
-
+> 💡 فقط کافیه `SalonAccounting.exe` رو دانلود و اجرا کنید — نیازی به نصب پایتون نیست!
 > ⚠️ فایل `.exe` فقط روی ویندوز کار می‌کنه. برای موبایل از وب‌اپ استفاده کنید.
 
 ### روش ۳: اجرا با پایتون (نیاز به نصب پایتون)

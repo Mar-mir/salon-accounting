@@ -13,9 +13,35 @@ from openpyxl.utils import get_column_letter
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
+# ─── Data Directory ───
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+EMPLOYEES_FILE = os.path.join(DATA_DIR, "employees.xlsx")
+SERVICES_FILE = os.path.join(DATA_DIR, "services.xlsx")
+TRANSACTIONS_FILE = os.path.join(DATA_DIR, "transactions.xlsx")
+CUSTOMERS_FILE = os.path.join(DATA_DIR, "customers.xlsx")
+
 # ─── Login Password ───
-# رمز عبور منشی — اینجا تغییر بدید
-SECRET_PASSWORD = "1234"
+DEFAULT_PASSWORD = "1234"
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+
+def get_password():
+    """خواندن رمز از فایل settings.json"""
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, "r") as f:
+            data = json.load(f)
+            return data.get("password", DEFAULT_PASSWORD)
+    return DEFAULT_PASSWORD
+
+def set_password(new_password):
+    """ذخیره رمز جدید در settings.json"""
+    data = {}
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, "r") as f:
+            data = json.load(f)
+    data["password"] = new_password
+    with open(SETTINGS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
 
 def login_required(f):
     """محافظت از صفحات — اگه لاگین نباشه به صفحه لاگین می‌ره"""
@@ -25,14 +51,6 @@ def login_required(f):
             return redirect(url_for("login_page"))
         return f(*args, **kwargs)
     return decorated
-
-# ─── Data Directory ───
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-os.makedirs(DATA_DIR, exist_ok=True)
-EMPLOYEES_FILE = os.path.join(DATA_DIR, "employees.xlsx")
-SERVICES_FILE = os.path.join(DATA_DIR, "services.xlsx")
-TRANSACTIONS_FILE = os.path.join(DATA_DIR, "transactions.xlsx")
-CUSTOMERS_FILE = os.path.join(DATA_DIR, "customers.xlsx")
 
 # ─── Persian Date ───
 class PersianDate:
@@ -197,7 +215,7 @@ def login_page():
     error = False
     if request.method == "POST":
         pw = request.form.get("password", "")
-        if pw == SECRET_PASSWORD:
+        if pw == get_password():
             session["logged_in"] = True
             session.permanent = True
             return redirect(url_for("index"))
@@ -209,6 +227,26 @@ def login_page():
 def logout():
     session.clear()
     return redirect(url_for("login_page"))
+
+@app.route("/change-password", methods=["GET","POST"])
+@login_required
+def change_password():
+    if request.method == "POST":
+        current = request.form.get("current_password", "")
+        new_pw = request.form.get("new_password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        if current != get_password():
+            flash("❌ رمز فعلی اشتباه است", "error")
+        elif len(new_pw) < 4:
+            flash("❌ رمز جدید باید حداقل ۴ کاراکتر باشد", "error")
+        elif new_pw != confirm:
+            flash("❌ رمز جدید و تکرار آن مطابقت ندارند", "error")
+        else:
+            set_password(new_pw)
+            flash("✅ رمز عبور با موفقیت تغییر کرد", "success")
+            return redirect(url_for("index"))
+    return render_template("change_password.html")
 
 # ─── Routes ───
 @app.route("/")

@@ -4,13 +4,27 @@
 import os, sys, json
 from datetime import datetime, timedelta
 from collections import defaultdict
-from flask import Flask, render_template, request, redirect, url_for, send_file, flash, jsonify
+from functools import wraps
+from flask import Flask, render_template, request, redirect, url_for, send_file, flash, jsonify, session
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+
+# ─── Login Password ───
+# رمز عبور منشی — اینجا تغییر بدید
+SECRET_PASSWORD = "1234"
+
+def login_required(f):
+    """محافظت از صفحات — اگه لاگین نباشه به صفحه لاگین می‌ره"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login_page"))
+        return f(*args, **kwargs)
+    return decorated
 
 # ─── Data Directory ───
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -175,18 +189,42 @@ def _file_size(fp):
     s = os.path.getsize(fp)
     return f"{s//1024} KB" if s < 1048576 else f"{s//1048576} MB"
 
+# ─── Login / Logout ───
+@app.route("/login", methods=["GET", "POST"])
+def login_page():
+    if session.get("logged_in"):
+        return redirect(url_for("index"))
+    error = False
+    if request.method == "POST":
+        pw = request.form.get("password", "")
+        if pw == SECRET_PASSWORD:
+            session["logged_in"] = True
+            session.permanent = True
+            return redirect(url_for("index"))
+        else:
+            error = True
+    return render_template("login.html", error=error)
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login_page"))
+
 # ─── Routes ───
 @app.route("/")
+@login_required
 def index():
     return render_template("index.html", today=PersianDate.today_str(),
         services=get_services(), employees=get_employees())
 
 @app.route("/add_item", methods=["POST"])
+@login_required
 def add_item():
     """Add a transaction item (stored in session-like approach via JS)"""
     return jsonify({"ok": True})
 
 @app.route("/submit_transaction", methods=["POST"])
+@login_required
 def submit_transaction():
     data = request.form
     customer = data.get("customer_name","").strip()
@@ -210,6 +248,7 @@ def submit_transaction():
     return redirect(url_for("index"))
 
 @app.route("/reports")
+@login_required
 def reports():
     today = PersianDate.today_str()
     txns = get_transactions(start_date=today, end_date=today)
@@ -225,6 +264,7 @@ def reports():
         commission=commission, today=today)
 
 @app.route("/monthly", methods=["GET","POST"])
+@login_required
 def monthly():
     now = datetime.now()
     month_str = request.args.get("month", f"{now.year}/{now.month:02d}")
@@ -261,6 +301,7 @@ def monthly():
         grand_total=grand_total, grand_comm=grand_comm, total_count=len(monthly_txns))
 
 @app.route("/monthly/export/<month_str>")
+@login_required
 def export_monthly(month_str):
     try:
         parts = month_str.split("/"); y, m = int(parts[0]), int(parts[1])
@@ -285,6 +326,7 @@ def export_monthly(month_str):
     return send_file(fp, as_attachment=True)
 
 @app.route("/customers", methods=["GET","POST"])
+@login_required
 def customers_page():
     if request.method == "POST":
         action = request.form.get("action")
@@ -305,6 +347,7 @@ def customers_page():
     return render_template("customers.html", customers=custs, query=query)
 
 @app.route("/customers/export")
+@login_required
 def export_customers():
     custs = get_customers()
     wb = Workbook(); ws = wb.active; ws.title = "دفترچه مشتریان"
@@ -321,6 +364,7 @@ def export_customers():
     return send_file(fp, as_attachment=True)
 
 @app.route("/employees", methods=["GET","POST"])
+@login_required
 def employees_page():
     if request.method == "POST":
         action = request.form.get("action")
@@ -336,6 +380,7 @@ def employees_page():
     return render_template("employees.html", employees=get_employees())
 
 @app.route("/services", methods=["GET","POST"])
+@login_required
 def services_page():
     if request.method == "POST":
         action = request.form.get("action")
@@ -351,6 +396,7 @@ def services_page():
     return render_template("services.html", services=get_services())
 
 @app.route("/backup", methods=["GET","POST"])
+@login_required
 def backup_page():
     if request.method == "POST":
         action = request.form.get("action")
@@ -406,6 +452,7 @@ def backup_page():
     return render_template("backup.html", backups=backups[:20], today=PersianDate.today_str())
 
 @app.route("/download/<filename>")
+@login_required
 def download(filename):
     fp = os.path.join(DATA_DIR, filename)
     if os.path.exists(fp): return send_file(fp, as_attachment=True)
@@ -413,10 +460,12 @@ def download(filename):
 
 # ─── API for transaction form ───
 @app.route("/api/services")
+@login_required
 def api_services():
     return jsonify(get_services())
 
 @app.route("/api/employees")
+@login_required
 def api_employees():
     return jsonify(get_employees())
 
